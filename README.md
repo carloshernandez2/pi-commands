@@ -7,10 +7,10 @@ CLI toolkit for [pi](https://github.com/earendil-works/pi-coding-agent): web sea
 ## Quick Reference
 
 ```bash
-my-commands web-search "query" [-n NUM] [-c CATEGORY] [-j]
-my-commands fetch-page "https://example.com"
-my-commands agent <subcommand> [args...]
-my-commands help
+pi-commands web-search "query" [-n NUM] [-c CATEGORY] [-j]
+pi-commands fetch-page "https://example.com"
+pi-commands agent <subcommand> [args...]
+pi-commands help
 ```
 
 ---
@@ -21,17 +21,17 @@ Backed by a local SearXNG instance (`localhost:8888`).
 
 ```bash
 # Basic search (10 results)
-my-commands web-search "rust async runtimes 2025"
+pi-commands web-search "rust async runtimes 2025"
 
 # Limit results
-my-commands web-search "query" -n 5
+pi-commands web-search "query" -n 5
 
 # Filter by category
-my-commands web-search "query" -c IT
+pi-commands web-search "query" -c IT
 # Categories: general, images, news, videos, IT, science, files, music
 
 # Raw JSON output
-my-commands web-search "query" -j
+pi-commands web-search "query" -j
 ```
 
 ---
@@ -41,7 +41,7 @@ my-commands web-search "query" -j
 Downloads a URL and extracts readable text using `trafilatura`.
 
 ```bash
-my-commands fetch-page "https://example.com/article"
+pi-commands fetch-page "https://example.com/article"
 ```
 
 ---
@@ -67,60 +67,60 @@ systemctl --user stop pi-agents-daemon.service
 
 ```bash
 # Spawn a new agent
-my-commands agent spawn <name> "prompt" [--model provider/model-id]
+pi-commands agent spawn <name> "prompt" [--model provider/model-id]
 
 # Send a follow-up message to an existing agent
-my-commands agent message <name> "prompt"
+pi-commands agent message <name> "prompt"
 
 # View an agent's conversation
-my-commands agent messages <name> [--tail N]
+pi-commands agent messages <name> [--tail N]
 
 # List all running agents
-my-commands agent status
+pi-commands agent status
 
 # Kill a specific agent or all agents
-my-commands agent kill <name>
-my-commands agent kill --all
+pi-commands agent kill <name>
+pi-commands agent kill --all
 
 # Stop the daemon (kills all agents first)
-my-commands agent stop
+pi-commands agent stop
 ```
 
 ### Examples
 
 ```bash
 # Spawn two agents in parallel
-my-commands agent spawn architect "Design a REST API for task management"
-my-commands agent spawn reviewer "Review this design for security issues"
+pi-commands agent spawn architect "Design a REST API for task management"
+pi-commands agent spawn reviewer "Review this design for security issues"
 
 # Check status
-my-commands agent status
+pi-commands agent status
 # === Agents: 2 running ===
 # architect   [streaming]   1 msgs
 # reviewer    [idle]        0 msgs
 
 # Send a follow-up
-my-commands agent message architect "Also add rate limiting"
+pi-commands agent message architect "Also add rate limiting"
 
 # Read the last 3 messages from an agent
-my-commands agent messages architect --tail 3
+pi-commands agent messages architect --tail 3
 
 # Use a specific model
-my-commands agent spawn --model "anthropic/claude-sonnet-4-20250514" coder "Implement the API"
+pi-commands agent spawn --model "anthropic/claude-sonnet-4-20250514" coder "Implement the API"
 
 # Clean up
-my-commands agent kill architect
-my-commands agent kill --all
-my-commands agent stop
+pi-commands agent kill architect
+pi-commands agent kill --all
+pi-commands agent stop
 ```
 
 ### Architecture
 
 ```
-my-commands (thin wrapper in ~/.bin/)
-  └─ ~/.pi/my-commands/pi-commands (main script)
+pi-commands (thin wrapper in ~/.bin/)
+  └─ ~/.pi/pi-commands/pi-commands (main script)
        └─ systemd → pi-agents-daemon.service
-            └─ ~/.pi/my-commands/daemon/index.ts (Node.js)
+            └─ ~/.pi/pi-commands/daemon/index.ts (Node.js)
                  └─ Unix socket → ~/.pi/agent/.agents-daemon.sock
                       └─ AgentSession "architect" (SDK, in-process)
                       └─ AgentSession "reviewer"  (SDK, in-process)
@@ -133,9 +133,9 @@ Agents run in-process via the pi SDK (not subprocesses), giving direct access to
 
 | Path | Purpose |
 |------|---------|
-| `~/.bin/my-commands` | Thin wrapper (on PATH) |
-| `~/.pi/my-commands/` | Source code, docs |
-| `~/.pi/my-commands/daemon/` | Daemon source (Node.js) |
+| `~/.bin/pi-commands` | Thin wrapper (on PATH) |
+| `~/.pi/pi-commands/` | Source code, docs |
+| `~/.pi/pi-commands/daemon/` | Daemon source (Node.js) |
 | `~/.pi/agent/` | Runtime data (socket, PID, logs, sessions) |
 | `~/.config/systemd/user/pi-agents-daemon.service` | systemd service |
 

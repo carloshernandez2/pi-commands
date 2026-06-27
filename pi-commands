@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# my-commands — Dispatcher for web search, page extraction, and multi-agent orchestration
-# Usage: my-commands <command> [args...]
+# pi-commands — Dispatcher for web search, page extraction, and multi-agent orchestration
+# Usage: pi-commands <command> [args...]
 #
 # Commands:
 #   web-search  "query" [-n NUM] [-c CATEGORY] [-j]
@@ -88,7 +88,7 @@ do_fetch_page() {
 }
 
 # ── agents daemon helpers ──────────────────────────────────────────
-DAEMON_DIR="$HOME/.pi/my-commands/daemon"
+DAEMON_DIR="$HOME/.pi/pi-commands/daemon"
 DAEMON_SOCK="$HOME/.pi/agent/.agents-daemon.sock"
 DAEMON_PID="$HOME/.pi/agent/.agents-daemon.pid"
 
@@ -146,7 +146,7 @@ do_agent() {
             do_agent_stop "$@" ;;
         *)
             echo "agent: unknown subcommand '$subcmd'" >&2
-            echo "Usage: my-commands agent <spawn|message|messages|status|kill|stop>" >&2
+            echo "Usage: pi-commands agent <spawn|message|messages|status|kill|stop>" >&2
             exit 1 ;;
     esac
 }
@@ -165,7 +165,7 @@ do_agent_spawn() {
     done
     [[ -z "$name" || -z "$prompt" ]] && {
         echo "agent spawn: requires name and prompt" >&2
-        echo "Usage: my-commands agent spawn <name> [\"prompt\"]" >&2
+        echo "Usage: pi-commands agent spawn <name> [\"prompt\"]" >&2
         exit 1
     }
 
@@ -338,8 +338,8 @@ do_agent_stop() {
 
 # ── Main dispatcher ────────────────────────────────────────────────
 if [[ $# -lt 1 ]]; then
-    echo "my-commands: no command given" >&2
-    echo "Usage: my-commands <web-search|fetch-page|agent|help> [args...]" >&2
+    echo "pi-commands: no command given" >&2
+    echo "Usage: pi-commands <web-search|fetch-page|agent|help> [args...]" >&2
     exit 1
 fi
 
@@ -354,8 +354,8 @@ case "$COMMAND" in
         sed -n '1,/^set -euo pipefail/p' "$0" | head -n -1
         ;;
     *)
-        echo "my-commands: unknown command '$COMMAND'" >&2
-        echo "Usage: my-commands <web-search|fetch-page|agent|help> [args...]" >&2
+        echo "pi-commands: unknown command '$COMMAND'" >&2
+        echo "Usage: pi-commands <web-search|fetch-page|agent|help> [args...]" >&2
         exit 1
         ;;
 esac
