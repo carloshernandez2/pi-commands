@@ -4,6 +4,48 @@ CLI toolkit for [pi](https://github.com/earendil-works/pi-coding-agent): web sea
 
 [![GitHub](https://img.shields.io/badge/github-carloshernandez2/pi-commands-blue)](https://github.com/carloshernandez2/pi-commands)
 
+## Install
+
+### Prerequisites
+
+- **Node.js** ≥ 22 (with `--experimental-strip-types` support)
+- **systemd** (user services)
+- **curl**, **jq**, **ncat** (usually `nmap-ncat` package), **trafilatura**
+- **[pi](https://github.com/earendil-works/pi-coding-agent)** installed
+
+### Setup
+
+```bash
+# Clone
+mkdir -p ~/.pi/pi-commands
+git clone https://github.com/carloshernandez2/pi-commands.git ~/.pi/pi-commands
+
+# Install daemon dependencies
+cd ~/.pi/pi-commands/daemon && npm install
+
+# Install systemd service
+cp ~/.pi/pi-commands/systemd/pi-agents-daemon.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now pi-agents-daemon.service
+
+# Create thin wrapper (if ~/.bin is on PATH)
+mkdir -p ~/.bin
+cat > ~/.bin/pi-commands << 'EOF'
+#!/usr/bin/env bash
+exec "$HOME/.pi/pi-commands/pi-commands" "$@"
+EOF
+chmod +x ~/.bin/pi-commands
+```
+
+Verify:
+
+```bash
+pi-commands help
+pi-commands agent status
+```
+
+---
+
 ## Quick Reference
 
 ```bash
