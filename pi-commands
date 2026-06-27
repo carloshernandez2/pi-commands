@@ -14,7 +14,7 @@
 #
 #   agent       <subcommand> [args...]
 #       Multi-agent orchestration (spawn/manage pi sub-agents).
-#       Subcommands: spawn, message, messages, status, kill, stop.
+#       Subcommands: spawn, message, messages, status, delete.
 #
 #   help        Show this message.
 
@@ -89,8 +89,8 @@ do_fetch_page() {
 
 # ── agents daemon helpers ──────────────────────────────────────────
 DAEMON_DIR="$HOME/.pi/pi-commands/daemon"
-DAEMON_SOCK="$HOME/.pi/agent/.agents-daemon.sock"
-DAEMON_PID="$HOME/.pi/agent/.agents-daemon.pid"
+DAEMON_SOCK="$HOME/.pi/agent/.daemon/sock"
+DAEMON_PID="$HOME/.pi/agent/.daemon/pid"
 
 agent_daemon_running() {
     systemctl --user is-active --quiet pi-agents-daemon.service 2>/dev/null
@@ -101,7 +101,7 @@ agent_daemon_start() {
 
     # Start via systemd (handles lifecycle, restart, logging)
     if ! systemctl --user start pi-agents-daemon.service 2>/dev/null; then
-        echo "agent: failed to start daemon via systemd" >&2
+        echo "agent: failed to start agent service" >&2
         return 1
     fi
 
@@ -111,7 +111,7 @@ agent_daemon_start() {
         sleep 0.5
     done
 
-    echo "agent: daemon failed to start" >&2
+    echo "agent: service failed to start" >&2
     return 1
 }
 
@@ -119,7 +119,7 @@ agent_send() {
     # $1 = JSON command, returns response line
     local response
     response=$(echo "$1" | ncat -U -w 10 "$DAEMON_SOCK" 2>/dev/null) || {
-        echo "agent: daemon not responding" >&2
+        echo "agent: service not responding" >&2
         return 1
     }
     echo "$response"
@@ -140,13 +140,11 @@ do_agent() {
             do_agent_messages "$@" ;;
         status)
             do_agent_status "$@" ;;
-        kill)
-            do_agent_kill "$@" ;;
-        stop)
-            do_agent_stop "$@" ;;
+        delete)
+            do_agent_delete "$@" ;;
         *)
             echo "agent: unknown subcommand '$subcmd'" >&2
-            echo "Usage: pi-commands agent <spawn|message|messages|status|kill|stop>" >&2
+            echo "Usage: pi-commands agent <spawn|message|messages|status|delete>" >&2
             exit 1 ;;
     esac
 }
@@ -286,54 +284,34 @@ do_agent_status() {
     jq -r '.data.agents[] | "\(.name)\t[\(if .streaming then "streaming" else "idle" end)]\t\(.messageCount) msgs\(if .preview then "\t" + .preview else "" end)"' <<< "$response"
 }
 
-# ── agent kill ─────────────────────────────────────────────────────
-do_agent_kill() {
-    local name="" kill_all=false
+# ── agent delete ───────────────────────────────────────────────────
+do_agent_delete() {
+    local name=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --all) kill_all=true; shift ;;
-            -*) echo "agent kill: unknown option $1" >&2; exit 1 ;;
+            -*) echo "agent delete: unknown option $1" >&2; exit 1 ;;
             *) name="$1"; shift ;;
         esac
     done
+    [[ -z "$name" ]] && {
+        echo "agent delete: requires name" >&2
+        exit 1
+    }
 
     agent_daemon_start || exit 1
 
     local json
-    if [[ "$kill_all" == true ]]; then
-        json=$(jq -nc '{cmd: "kill-all"}')
-        local response
-        response=$(agent_send "$json")
-        if jq -e '.ok' <<< "$response" &>/dev/null; then
-            echo "Killed all $(jq -r '.data.killed' <<< "$response") agents"
-        fi
+    json=$(jq -nc --arg cmd delete --arg name "$name" '{cmd: $cmd, name: $name}')
+
+    local response
+    response=$(agent_send "$json")
+
+    if jq -e '.ok' <<< "$response" &>/dev/null; then
+        echo "Deleted agent: $name"
     else
-        [[ -z "$name" ]] && {
-            echo "agent kill: requires name or --all" >&2
-            exit 1
-        }
-        json=$(jq -nc --arg cmd kill --arg name "$name" '{cmd: $cmd, name: $name}')
-        local response
-        response=$(agent_send "$json")
-        if jq -e '.ok' <<< "$response" &>/dev/null; then
-            echo "Killed agent: $name"
-        else
-            echo "agent: $(jq -r '.error // "unknown error"' <<< "$response")" >&2
-            exit 1
-        fi
+        echo "agent: $(jq -r '.error // "unknown error"' <<< "$response")" >&2
+        exit 1
     fi
-}
-
-# ── agent stop ─────────────────────────────────────────────────────
-do_agent_stop() {
-    if ! agent_daemon_running; then
-        echo "Daemon not running"
-        return 0
-    fi
-
-    # Stop via systemd (graceful shutdown, cleanup handled by daemon)
-    systemctl --user stop pi-agents-daemon.service 2>/dev/null
-    echo "Daemon stopped"
 }
 
 # ── Main dispatcher ────────────────────────────────────────────────

@@ -10,9 +10,7 @@
  *   { cmd: "message", name: string, prompt: string }
  *   { cmd: "messages", name: string, tail?: number }
  *   { cmd: "status" }
- *   { cmd: "kill", name: string }
- *   { cmd: "kill-all" }
- *   { cmd: "stop" }
+ *   { cmd: "delete", name: string }         // remove agent registration
  *
  * Responses (written to stdout, one JSON per line, matched by `id`):
  *   { id: string, ok: boolean, data?: any, error?: string }
@@ -21,7 +19,6 @@
 import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 
 import {
   createAgentSession,
@@ -35,17 +32,16 @@ import {
 
 // ── Paths ──────────────────────────────────────────────────────────
 const AGENT_DIR = getAgentDir();
-const SOCK_PATH = path.join(AGENT_DIR, ".agents-daemon.sock");
-const PID_PATH = path.join(AGENT_DIR, ".agents-daemon.pid");
+const DAEMON_DIR = path.join(AGENT_DIR, ".daemon");
+const SOCK_PATH = path.join(DAEMON_DIR, "sock");
+const PID_PATH = path.join(DAEMON_DIR, "pid");
 const SESSIONS_DIR = path.join(AGENT_DIR, "agent-sessions");
-const LOG_PATH = path.join(AGENT_DIR, ".agents-daemon.log");
 
-// ── Logging ────────────────────────────────────────────────────────
+// ── Logging (stdout → journalctl via systemd) ──────────────────────
 function log(...args: unknown[]): void {
   const ts = new Date().toISOString();
   const line = `[${ts}] ${args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")}`;
   console.log(line);
-  try { fs.appendFileSync(LOG_PATH, line + "\n"); } catch {}
 }
 
 // ── State ──────────────────────────────────────────────────────────
@@ -141,43 +137,17 @@ async function createAgent(
   return state;
 }
 
-async function restoreAgent(name: string): Promise<AgentState | null> {
-  const dir = agentSessionDir(name);
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"));
-  if (files.length === 0) return null;
 
-  const authStorage = AuthStorage.create();
-  const modelRegistry = ModelRegistry.create(authStorage);
 
-  const { session } = await createAgentSession({
-    cwd: process.cwd(),
-    sessionManager: SessionManager.continueRecent(dir),
-    authStorage,
-    modelRegistry,
-  });
-
-  const state: AgentState = {
-    session,
-    prompt: "",
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-    currentText: "",
-  };
-
-  session.subscribe(() => {
-    state.lastActivity = Date.now();
-  });
-
-  agents.set(name, state);
-  return state;
-}
-
-function killAgent(name: string): void {
+function deleteAgent(name: string): void {
   const state = agents.get(name);
   if (state) {
-    log("Killing agent:", name);
+    const dir = agentSessionDir(name);
+    log("Deleting agent:", name);
     state.session.dispose();
     agents.delete(name);
+    // Remove the entire session directory
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
   }
 }
 
@@ -268,27 +238,20 @@ function handleStatus(socket: net.Socket, id: string): void {
   respond(socket, id, { agents: list });
 }
 
-function handleKill(socket: net.Socket, id: string, name: string): void {
+function handleDelete(socket: net.Socket, id: string, name: string): void {
   const state = agents.get(name);
   if (!state) return error(socket, id, `Agent "${name}" not found`);
-  killAgent(name);
-  respond(socket, id, { name, status: "killed" });
-}
-
-function handleKillAll(socket: net.Socket, id: string): void {
-  const count = agents.size;
-  for (const name of agents.keys()) {
-    killAgent(name);
-  }
-  respond(socket, id, { killed: count });
+  deleteAgent(name);
+  respond(socket, id, { name, status: "deleted" });
 }
 
 // ── Socket server ──────────────────────────────────────────────────
 
 function cleanup(): void {
-  log("Cleanup: killing", agents.size, "agent(s)");
+  log("Cleanup: disposing", agents.size, "agent(s)");
   for (const name of agents.keys()) {
-    killAgent(name);
+    const state = agents.get(name);
+    if (state) { state.session.dispose(); agents.delete(name); }
   }
   try { fs.unlinkSync(SOCK_PATH); } catch {}
   try { fs.unlinkSync(PID_PATH); } catch {}
@@ -323,7 +286,6 @@ function startServer(): net.Server {
 
     socket.on("close", () => {
       // Daemon stays alive regardless of socket connections.
-      // Only explicit "stop" command or SIGTERM/SIGINT shuts it down.
     });
   });
 
@@ -372,48 +334,25 @@ async function processCommand(socket: net.Socket, raw: unknown): Promise<void> {
     case "status":
       handleStatus(socket, id);
       break;
-    case "kill": {
+    case "delete": {
       const name = String(cmd.name ?? "");
-      if (!name) return error(socket, id, "kill requires name");
-      handleKill(socket, id, name);
+      if (!name) return error(socket, id, "delete requires name");
+      handleDelete(socket, id, name);
       break;
     }
-    case "kill-all":
-      handleKillAll(socket, id);
-      break;
-    case "stop":
-      respond(socket, id, { status: "shutting down" });
-      cleanup();
-      server.close();
-      process.exit(0);
-      break;
     default:
       error(socket, id, `Unknown command: ${cmd.cmd}`);
   }
 }
 
-// ── Restore existing agents on startup ─────────────────────────────
+// ── Startup ────────────────────────────────────────────────────────
 
 let server: net.Server;
 
 async function main(): Promise<void> {
   log("Daemon starting (pid", process.pid, ")");
+  ensureDir(DAEMON_DIR);
   ensureDir(SESSIONS_DIR);
-
-  // Restore any existing agent session directories BEFORE listening
-  // so the server is fully ready when the socket appears
-  try {
-    const dirs = fs.readdirSync(SESSIONS_DIR);
-    for (const d of dirs) {
-      const fullPath = path.join(SESSIONS_DIR, d);
-      if (fs.statSync(fullPath).isDirectory()) {
-        log("Restoring agent:", d);
-        await restoreAgent(d);
-      }
-    }
-  } catch (err) {
-    log("Restore error (non-fatal):", err);
-  }
 
   server = startServer();
 }

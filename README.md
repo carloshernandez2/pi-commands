@@ -48,20 +48,9 @@ pi-commands fetch-page "https://example.com/article"
 
 ## Multi-Agent Orchestration
 
-Spawns independent pi AgentSession instances managed by a background daemon. Each agent has its own conversation, tools, and LLM calls. All commands return fast (non-blocking).
+Spawns independent pi AgentSession instances managed by a background service. Each agent has its own conversation, tools, and LLM calls. All commands return fast (non-blocking).
 
-### Daemon
-
-The daemon (`~/.pi/agents-daemon/index.ts`) runs as a systemd user service (`pi-agents-daemon.service`). It auto-starts on the first agent command and stays alive until explicitly stopped.
-
-```bash
-# Check daemon status
-systemctl --user status pi-agents-daemon.service
-
-# Manual start/stop (usually not needed — CLI auto-starts)
-systemctl --user start pi-agents-daemon.service
-systemctl --user stop pi-agents-daemon.service
-```
+The service auto-starts on the first agent command.
 
 ### Commands
 
@@ -78,12 +67,8 @@ pi-commands agent messages <name> [--tail N]
 # List all running agents
 pi-commands agent status
 
-# Kill a specific agent or all agents
-pi-commands agent kill <name>
-pi-commands agent kill --all
-
-# Stop the daemon (kills all agents first)
-pi-commands agent stop
+# Delete an agent
+pi-commands agent delete <name>
 ```
 
 ### Examples
@@ -109,9 +94,7 @@ pi-commands agent messages architect --tail 3
 pi-commands agent spawn --model "anthropic/claude-sonnet-4-20250514" coder "Implement the API"
 
 # Clean up
-pi-commands agent kill architect
-pi-commands agent kill --all
-pi-commands agent stop
+pi-commands agent delete architect
 ```
 
 ### Architecture
@@ -121,7 +104,7 @@ pi-commands (thin wrapper in ~/.bin/)
   └─ ~/.pi/pi-commands/pi-commands (main script)
        └─ systemd → pi-agents-daemon.service
             └─ ~/.pi/pi-commands/daemon/index.ts (Node.js)
-                 └─ Unix socket → ~/.pi/agent/.agents-daemon.sock
+                 └─ Unix socket → ~/.pi/agent/.daemon/sock
                       └─ AgentSession "architect" (SDK, in-process)
                       └─ AgentSession "reviewer"  (SDK, in-process)
                       └─ ...
@@ -136,15 +119,11 @@ Agents run in-process via the pi SDK (not subprocesses), giving direct access to
 | `~/.bin/pi-commands` | Thin wrapper (on PATH) |
 | `~/.pi/pi-commands/` | Source code, docs |
 | `~/.pi/pi-commands/daemon/` | Daemon source (Node.js) |
-| `~/.pi/agent/` | Runtime data (socket, PID, logs, sessions) |
+| `~/.pi/agent/.daemon/` | Runtime data (socket, PID) |
+| `~/.pi/agent/agent-sessions/` | Agent working directories |
+| `~/.pi/agent/sessions/` | Conversation data (JSONL) |
 | `~/.config/systemd/user/pi-agents-daemon.service` | systemd service |
-
-### Persistence
-
-Agent sessions are stored in `~/.pi/agent/agent-sessions/<name>/`. On daemon restart, existing sessions are automatically restored.
 
 ### Logs
 
-- Daemon log: `~/.pi/agent/.agents-daemon.log`
-- Daemon stdout/stderr: `~/.pi/agent/.agents-daemon-stdout.log`
-- systemd journal: `journalctl --user -u pi-agents-daemon.service`
+- `journalctl --user -u pi-agents-daemon.service`
