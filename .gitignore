@@ -10,3 +10,4 @@ daemon/node_modules/
 .DS_Store
 *.swp
 *.swo
+daemon/package-lock.json
