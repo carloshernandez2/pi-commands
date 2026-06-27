@@ -1,6 +1,8 @@
-# my-commands
+# pi-commands
 
-CLI tool for web search, page extraction, and multi-agent orchestration.
+CLI toolkit for [pi](https://github.com/earendil-works/pi-coding-agent): web search, page extraction, and multi-agent orchestration.
+
+[![GitHub](https://img.shields.io/badge/github-carloshernandez2/pi-commands-blue)](https://github.com/carloshernandez2/pi-commands)
 
 ## Quick Reference
 
@@ -115,15 +117,27 @@ my-commands agent stop
 ### Architecture
 
 ```
-my-commands agent <subcommand>
-  └─ systemd → pi-agents-daemon.service
-       └─ Unix socket → agents-daemon (Node.js)
-            └─ AgentSession "architect" (SDK, in-process)
-            └─ AgentSession "reviewer"  (SDK, in-process)
-            └─ ...
+my-commands (thin wrapper in ~/.bin/)
+  └─ ~/.pi/my-commands/pi-commands (main script)
+       └─ systemd → pi-agents-daemon.service
+            └─ ~/.pi/my-commands/daemon/index.ts (Node.js)
+                 └─ Unix socket → ~/.pi/agent/.agents-daemon.sock
+                      └─ AgentSession "architect" (SDK, in-process)
+                      └─ AgentSession "reviewer"  (SDK, in-process)
+                      └─ ...
 ```
 
 Agents run in-process via the pi SDK (not subprocesses), giving direct access to session state, messages, and streaming events.
+
+### Layout
+
+| Path | Purpose |
+|------|---------|
+| `~/.bin/my-commands` | Thin wrapper (on PATH) |
+| `~/.pi/my-commands/` | Source code, docs |
+| `~/.pi/my-commands/daemon/` | Daemon source (Node.js) |
+| `~/.pi/agent/` | Runtime data (socket, PID, logs, sessions) |
+| `~/.config/systemd/user/pi-agents-daemon.service` | systemd service |
 
 ### Persistence
 
