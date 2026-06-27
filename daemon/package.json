@@ -1,0 +1,7 @@
+{
+  "name": "pi-agents-daemon",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "file:../../.local/lib/node_modules/@earendil-works/pi-coding-agent"
+  }
+}

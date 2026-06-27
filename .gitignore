@@ -1,0 +1,12 @@
+# Dependencies
+daemon/node_modules/
+
+# Runtime data (managed by systemd + daemon)
+*.log
+*.pid
+*.sock
+
+# OS
+.DS_Store
+*.swp
+*.swo
