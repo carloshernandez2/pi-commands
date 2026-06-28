@@ -9,8 +9,9 @@ CLI toolkit for [pi](https://github.com/earendil-works/pi-coding-agent): web sea
 ### Prerequisites
 
 - **Node.js** ≥ 22 (with `--experimental-strip-types` support)
+- **Babashka** (bb)
 - **systemd** (user services)
-- **curl**, **jq**, **ncat** (usually `nmap-ncat` package), **trafilatura**
+- **trafilatura**
 - **[pi](https://github.com/earendil-works/pi-coding-agent)** installed
 
 ### Setup
@@ -32,7 +33,7 @@ systemctl --user enable --now pi-agents-daemon.service
 mkdir -p ~/.bin
 cat > ~/.bin/pi-commands << 'EOF'
 #!/usr/bin/env bash
-exec "$HOME/.pi/pi-commands/pi-commands" "$@"
+exec bb "$HOME/.pi/pi-commands/pi-commands.bb" "$@"
 EOF
 chmod +x ~/.bin/pi-commands
 ```
@@ -143,7 +144,7 @@ pi-commands agent delete architect
 
 ```
 pi-commands (thin wrapper in ~/.bin/)
-  └─ ~/.pi/pi-commands/pi-commands (main script)
+  └─ ~/.pi/pi-commands/pi-commands.bb (Babashka CLI)
        └─ systemd → pi-agents-daemon.service
             └─ ~/.pi/pi-commands/daemon/index.ts (Node.js)
                  └─ Unix socket → ~/.pi/agent/.daemon/sock

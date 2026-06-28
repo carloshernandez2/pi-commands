@@ -11,3 +11,5 @@ daemon/node_modules/
 *.swp
 *.swo
 daemon/package-lock.json
+.clj-kondo/.cache/
+.lsp/.cache/

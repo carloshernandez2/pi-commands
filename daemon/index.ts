@@ -7,7 +7,7 @@
  *
  * Commands (sent on stdin, one JSON per line):
  *   { cmd: "spawn", name: string, prompt: string, model?: string }
- *   { cmd: "message", name: string, prompt: string }
+ *   { cmd: "message", name: string, prompt: string, model?: string }
  *   { cmd: "messages", name: string, tail?: number }
  *   { cmd: "status" }
  *   { cmd: "delete", name: string }         // remove agent registration
@@ -51,6 +51,7 @@ let requestCounter = 0;
 interface AgentState {
   session: AgentSession;
   prompt: string;
+  model?: string;
   createdAt: number;
   lastActivity: number;
   // buffer assistant text deltas for streaming preview
@@ -60,11 +61,23 @@ interface AgentState {
 // ── Helpers ────────────────────────────────────────────────────────
 
 function respond(socket: net.Socket, id: string, data: unknown): void {
-  socket.write(JSON.stringify({ id, ok: true, data }) + "\n");
+  try {
+    if (socket.writable) {
+      socket.write(JSON.stringify({ id, ok: true, data }) + "\n");
+    }
+  } catch (err) {
+    log("respond write error:", err);
+  }
 }
 
 function error(socket: net.Socket, id: string, message: string): void {
-  socket.write(JSON.stringify({ id, ok: false, error: message }) + "\n");
+  try {
+    if (socket.writable) {
+      socket.write(JSON.stringify({ id, ok: false, error: message }) + "\n");
+    }
+  } catch (err) {
+    log("error write error:", err);
+  }
 }
 
 function ensureDir(dir: string): void {
@@ -104,9 +117,12 @@ async function createAgent(
     if (found) await session.setModel(found);
   }
 
+  await session.setAutoCompactionEnabled(true);
+
   const state: AgentState = {
     session,
     prompt,
+    model: modelPattern,
     createdAt: Date.now(),
     lastActivity: Date.now(),
     currentText: "",
@@ -176,10 +192,23 @@ async function handleMessage(
   id: string,
   name: string,
   prompt: string,
+  model?: string,
 ): Promise<void> {
   const state = agents.get(name);
   if (!state) return error(socket, id, `Agent "${name}" not found`);
   try {
+    if (model) {
+      const authStorage = AuthStorage.create();
+      const modelRegistry = ModelRegistry.create(authStorage);
+      const found = modelRegistry.find(
+        model.split("/")[0],
+        model.split("/").slice(1).join("/"),
+      );
+      if (found) {
+        await state.session.setModel(found);
+      }
+      state.model = model;
+    }
     state.session.prompt(prompt).catch(() => {});
     return respond(socket, id, { name, status: "message queued" });
   } catch (err) {
@@ -225,6 +254,7 @@ function handleMessages(
 function handleStatus(socket: net.Socket, id: string): void {
   const list = Array.from(agents.entries()).map(([name, state]) => ({
     name,
+    model: state.model,
     streaming: state.session.isStreaming,
     messageCount: state.session.messages.length,
     preview:
@@ -284,6 +314,14 @@ function startServer(): net.Server {
       }
     });
 
+    socket.on("error", (err) => {
+      if (err.code === "EPIPE" || err.code === "ECONNRESET") {
+        // Client disconnected before we could respond - normal behavior
+        return;
+      }
+      log("Socket error:", err);
+    });
+
     socket.on("close", () => {
       // Daemon stays alive regardless of socket connections.
     });
@@ -322,7 +360,7 @@ async function processCommand(socket: net.Socket, raw: unknown): Promise<void> {
       const name = String(cmd.name ?? "");
       const prompt = String(cmd.prompt ?? "");
       if (!name || !prompt) return error(socket, id, "message requires name and prompt");
-      await handleMessage(socket, id, name, prompt);
+      await handleMessage(socket, id, name, prompt, cmd.model ? String(cmd.model) : undefined);
       break;
     }
     case "messages": {
