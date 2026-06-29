@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.pi/pi-commands/daemon
-ExecStart=/usr/bin/node --experimental-strip-types %h/.pi/pi-commands/daemon/index.ts
+WorkingDirectory=%h/.pi/pi-commands-install/daemon
+ExecStart=/usr/bin/node --experimental-strip-types %h/.pi/pi-commands-install/daemon/index.ts
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

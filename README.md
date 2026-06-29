@@ -6,44 +6,12 @@ CLI toolkit for [pi](https://github.com/earendil-works/pi-coding-agent): web sea
 
 ## Install
 
-### Prerequisites
-
-- **Node.js** ≥ 22 (with `--experimental-strip-types` support)
-- **Babashka** (bb)
-- **systemd** (user services)
-- **trafilatura**
-- **[pi](https://github.com/earendil-works/pi-coding-agent)** installed
-
-### Setup
-
 ```bash
-# Clone
-mkdir -p ~/.pi/pi-commands
 git clone https://github.com/carloshernandez2/pi-commands.git ~/.pi/pi-commands
-
-# Install daemon dependencies
-cd ~/.pi/pi-commands/daemon && npm install
-
-# Install systemd service
-cp ~/.pi/pi-commands/systemd/pi-agents-daemon.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now pi-agents-daemon.service
-
-# Create thin wrapper (if ~/.bin is on PATH)
-mkdir -p ~/.bin
-cat > ~/.bin/pi-commands << 'EOF'
-#!/usr/bin/env bash
-exec bb "$HOME/.pi/pi-commands/pi-commands.bb" "$@"
-EOF
-chmod +x ~/.bin/pi-commands
+bb ~/.pi/pi-commands/src/install.bb
 ```
 
-Verify:
-
-```bash
-pi-commands help
-pi-commands agent status
-```
+That's it. The install script deploys the CLI and daemon artifacts, creates the shell wrapper, and sets up the systemd service.
 
 ---
 
@@ -144,7 +112,7 @@ pi-commands agent delete architect
 
 ```
 pi-commands (thin wrapper in ~/.bin/)
-  └─ ~/.pi/pi-commands/pi-commands.bb (Babashka CLI)
+  └─ ~/.pi/pi-commands-install/pi-commands.bb (deployed artifact)
        └─ systemd → pi-agents-daemon.service
             └─ ~/.pi/pi-commands/daemon/index.ts (Node.js)
                  └─ Unix socket → ~/.pi/agent/.daemon/sock
@@ -153,6 +121,11 @@ pi-commands (thin wrapper in ~/.bin/)
                       └─ ...
 ```
 
+> **Source vs artifact:** The Babashka CLI source lives at
+> `~/.pi/pi-commands/src/pi-commands.bb`. Edit freely, test with
+> `bb src/pi-commands.bb ...`, and deploy with `bb src/install.bb`.
+> The installed copy at `~/.pi/pi-commands-install/` is what runs.
+
 Agents run in-process via the pi SDK (not subprocesses), giving direct access to session state, messages, and streaming events.
 
 ### Layout
@@ -160,8 +133,9 @@ Agents run in-process via the pi SDK (not subprocesses), giving direct access to
 | Path | Purpose |
 |------|---------|
 | `~/.bin/pi-commands` | Thin wrapper (on PATH) |
-| `~/.pi/pi-commands/` | Source code, docs |
+| `~/.pi/pi-commands/src/` | CLI source (Babashka) |
 | `~/.pi/pi-commands/daemon/` | Daemon source (Node.js) |
+| `~/.pi/pi-commands-install/` | Deployed artifact |
 | `~/.pi/agent/.daemon/` | Runtime data (socket, PID) |
 | `~/.pi/agent/agent-sessions/` | Agent working directories |
 | `~/.pi/agent/sessions/` | Conversation data (JSONL) |
