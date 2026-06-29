@@ -94,6 +94,7 @@ async function createAgent(
   name: string,
   prompt: string,
   modelPattern?: string,
+  cwd?: string,
 ): Promise<AgentState> {
   const dir = agentSessionDir(name);
   ensureDir(dir);
@@ -102,7 +103,7 @@ async function createAgent(
   const modelRegistry = ModelRegistry.create(authStorage);
 
   const { session } = await createAgentSession({
-    cwd: process.cwd(),
+    cwd: cwd ?? process.cwd(),
     sessionManager: SessionManager.create(dir),
     authStorage,
     modelRegistry,
@@ -175,12 +176,13 @@ async function handleSpawn(
   name: string,
   prompt: string,
   model?: string,
+  cwd?: string,
 ): Promise<void> {
   if (agents.has(name)) {
     return error(socket, id, `Agent "${name}" already exists`);
   }
   try {
-    await createAgent(name, prompt, model);
+    await createAgent(name, prompt, model, cwd);
     return respond(socket, id, { name, status: "spawned" });
   } catch (err) {
     return error(socket, id, `Failed to spawn: ${err}`);
@@ -353,7 +355,9 @@ async function processCommand(socket: net.Socket, raw: unknown): Promise<void> {
       const name = String(cmd.name ?? "");
       const prompt = String(cmd.prompt ?? "");
       if (!name || !prompt) return error(socket, id, "spawn requires name and prompt");
-      await handleSpawn(socket, id, name, prompt, cmd.model ? String(cmd.model) : undefined);
+      await handleSpawn(socket, id, name, prompt,
+        cmd.model ? String(cmd.model) : undefined,
+        cmd.cwd ? String(cmd.cwd) : undefined);
       break;
     }
     case "message": {

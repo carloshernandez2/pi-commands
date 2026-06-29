@@ -175,11 +175,12 @@
   (let [opts (:opts ctx)
         name (:name opts)
         prompt (get-prompt ctx)
-        model (:model opts)]
+        model (:model opts)
+        cwd (System/getProperty "user.dir")]
     (when (or (str/blank? name) (str/blank? prompt))
       (exit-error "agent spawn: requires name and prompt"
                   "Usage: pi-commands agent spawn <name> [\"prompt\"]"))
-    (agent-op (cond-> {:cmd "spawn" :name name :prompt prompt}
+    (agent-op (cond-> {:cmd "spawn" :name name :prompt prompt :cwd cwd}
                (not (str/blank? model)) (assoc :model model))
               (fn [_] (println (str "Spawned agent: " name))))))
 
