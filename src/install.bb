@@ -6,7 +6,7 @@
 (def src-dir (.getParentFile (.getParentFile (java.io.File. *file*)))) ;; repo root
 (def install (str home "/.pi/pi-commands-install"))
 (def wrapper (str home "/.bin/pi-commands"))
-(def service-src (str (str src-dir "/systemd/pi-agents-daemon.service")))
+(def service-src (str src-dir "/systemd/pi-agents-daemon.service"))
 (def service-dest (str home "/.config/systemd/user/pi-agents-daemon.service"))
 
 (println "Installing pi-commands...")

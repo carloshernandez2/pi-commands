@@ -3,11 +3,11 @@
 ;; Usage: pi-commands <command> [args...]
 
 ;; ── Dependencies ──────────────────────────────────────────────────
-(require '[babashka.cli :as cli])
-(require '[babashka.http-client :as http])
-(require '[babashka.process :as proc])
-(require '[cheshire.core :as json])
-(require '[clojure.string :as str])
+(require '[babashka.cli :as cli]
+         '[babashka.http-client :as http]
+         '[babashka.process :refer [shell process]]
+         '[cheshire.core :as json]
+         '[clojure.string :as str])
 
 ;; ── Configuration ─────────────────────────────────────────────────
 (def SEARXNG-URL
@@ -37,14 +37,14 @@
 (defn daemon-running?
   "Check if the agent daemon systemd service is active."
   []
-  (zero? (:exit (proc/shell {:out :string :err :string}
+  (zero? (:exit (shell {:out :string :err :string}
                             "systemctl --user is-active --quiet pi-agents-daemon.service"))))
 
 (defn daemon-start
   "Ensure the agent daemon is running. Exits on failure."
   []
   (when-not (daemon-running?)
-    (let [result (proc/shell {:out :string :err :string}
+    (let [result (shell {:out :string :err :string}
                              "systemctl --user start pi-agents-daemon.service")]
       (when (not= (:exit result) 0)
         (exit-error "agent: failed to start agent service"))
@@ -160,7 +160,7 @@
     (try
       (let [response (http/get url
                                {:headers {"User-Agent" USER-AGENT}})
-            p (proc/process "trafilatura" {:out :string :err :string
+            p (process "trafilatura" {:out :string :err :string
                                            :in (:body response)})
             result @p]
         (when-let [out (:out result)]
@@ -324,7 +324,7 @@ Commands:
           (if (= ["agent"] dispatch-path)
             (exit-error "agent: no subcommand"
                         "Usage: pi-commands agent <spawn|message|messages|status|delete>")
-            (exit-error (str "pi-commands: incomplete command")
+            (exit-error "pi-commands: incomplete command"
                         "Usage: pi-commands <web-search|fetch-page|agent|help> [args...]"))))
       (throw e))))
 
