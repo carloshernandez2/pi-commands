@@ -7,7 +7,7 @@
  *
  * Commands (sent on stdin, one JSON per line):
  *   { cmd: "spawn", name: string, prompt: string, model?: string }
- *   { cmd: "message", name: string, prompt: string, model?: string }
+ *   { cmd: "message", name: string, prompt: string }
  *   { cmd: "messages", name: string, tail?: number }
  *   { cmd: "status" }
  *   { cmd: "delete", name: string }         // remove agent registration
@@ -115,7 +115,10 @@ async function createAgent(
       modelPattern.split("/")[0],
       modelPattern.split("/").slice(1).join("/"),
     );
-    if (found) await session.setModel(found);
+    if (!found) {
+      throw new Error(`Model not found: ${modelPattern}`);
+    }
+    await session.setModel(found);
   }
 
   await session.setAutoCompactionEnabled(true);
@@ -194,23 +197,10 @@ async function handleMessage(
   id: string,
   name: string,
   prompt: string,
-  model?: string,
 ): Promise<void> {
   const state = agents.get(name);
   if (!state) return error(socket, id, `Agent "${name}" not found`);
   try {
-    if (model) {
-      const authStorage = AuthStorage.create();
-      const modelRegistry = ModelRegistry.create(authStorage);
-      const found = modelRegistry.find(
-        model.split("/")[0],
-        model.split("/").slice(1).join("/"),
-      );
-      if (found) {
-        await state.session.setModel(found);
-      }
-      state.model = model;
-    }
     state.session.prompt(prompt).catch(() => {});
     return respond(socket, id, { name, status: "message queued" });
   } catch (err) {
@@ -364,7 +354,7 @@ async function processCommand(socket: net.Socket, raw: unknown): Promise<void> {
       const name = String(cmd.name ?? "");
       const prompt = String(cmd.prompt ?? "");
       if (!name || !prompt) return error(socket, id, "message requires name and prompt");
-      await handleMessage(socket, id, name, prompt, cmd.model ? String(cmd.model) : undefined);
+      await handleMessage(socket, id, name, prompt);
       break;
     }
     case "messages": {

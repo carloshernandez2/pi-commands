@@ -189,12 +189,10 @@
   [ctx]
   (let [opts (:opts ctx)
         name (:name opts)
-        prompt (get-prompt ctx)
-        model (:model opts)]
+        prompt (get-prompt ctx)]
     (when (or (str/blank? name) (str/blank? prompt))
       (exit-error "agent message: requires name and prompt"))
-    (agent-op (cond-> {:cmd "message" :name name :prompt prompt}
-               (not (str/blank? model)) (assoc :model model))
+    (agent-op {:cmd "message" :name name :prompt prompt}
               (fn [_] (println (str "Message sent to: " name))))))
 
 (defn handle-agent-messages
@@ -296,7 +294,6 @@ Commands:
 
    {:cmds ["agent" "message"]
     :fn handle-agent-message
-    :spec {:model {:desc "Model to use"}}
     :args->opts [:name :prompt]}
 
    {:cmds ["agent" "messages"]
