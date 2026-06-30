@@ -11,11 +11,11 @@
 
 (println "Installing pi-commands...")
 
-;; Deploy CLI and daemon — cp -n skips if already present
+;; Deploy CLI and daemon
 (shell {:dir install} "mkdir" "-p" "." "daemon")
-(shell "cp" "-n" (str src-dir "/src/pi-commands.bb") install)
-(shell "cp" "-n" (str src-dir "/daemon/index.ts") (str install "/daemon"))
-(shell "cp" "-n" (str src-dir "/daemon/package.json") (str install "/daemon"))
+(shell "cp" (str src-dir "/src/pi-commands.bb") install)
+(shell "cp" (str src-dir "/daemon/index.ts") (str install "/daemon"))
+(shell "cp" (str src-dir "/daemon/package.json") (str install "/daemon"))
 
 ;; Install daemon dependencies if node_modules is missing
 (when-not (.exists (java.io.File. (str install "/daemon/node_modules")))
