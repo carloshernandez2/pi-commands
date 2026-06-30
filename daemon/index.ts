@@ -96,6 +96,7 @@ async function createAgent(
   modelPattern?: string,
   cwd?: string,
 ): Promise<AgentState> {
+  const agentCwd = cwd ?? process.cwd();
   const dir = agentSessionDir(name);
   ensureDir(dir);
 
@@ -103,8 +104,8 @@ async function createAgent(
   const modelRegistry = ModelRegistry.create(authStorage);
 
   const { session } = await createAgentSession({
-    cwd: cwd ?? process.cwd(),
-    sessionManager: SessionManager.create(dir),
+    cwd: agentCwd,
+    sessionManager: SessionManager.create(agentCwd, dir),
     authStorage,
     modelRegistry,
     settingsManager: undefined, // use defaults
