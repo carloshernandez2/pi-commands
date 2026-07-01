@@ -202,7 +202,9 @@ async function handleMessage(
   const state = agents.get(name);
   if (!state) return error(socket, id, `Agent "${name}" not found`);
   try {
-    state.session.prompt(prompt).catch(() => {});
+    state.session.prompt(prompt).catch((err) => {
+      log("Prompt error for", name, ":", err);
+    });
     return respond(socket, id, { name, status: "message queued" });
   } catch (err) {
     return error(socket, id, `Failed to message: ${err}`);
@@ -245,18 +247,23 @@ function handleMessages(
 }
 
 function handleStatus(socket: net.Socket, id: string): void {
-  const list = Array.from(agents.entries()).map(([name, state]) => ({
-    name,
-    model: state.model,
-    streaming: state.session.isStreaming,
-    messageCount: state.session.messages.length,
-    preview:
-      state.currentText.length > 120
-        ? state.currentText.slice(0, 120) + "…"
-        : state.currentText || null,
-    createdAt: new Date(state.createdAt).toISOString(),
-    lastActivity: new Date(state.lastActivity).toISOString(),
-  }));
+  const list = Array.from(agents.entries()).map(([name, state]) => {
+    const stats = state.session.getSessionStats();
+    return {
+      name,
+      model: state.model,
+      streaming: state.session.isStreaming,
+      messageCount: state.session.messages.length,
+      preview:
+        state.currentText.length > 120
+          ? state.currentText.slice(0, 120) + "…"
+          : state.currentText || null,
+      createdAt: new Date(state.createdAt).toISOString(),
+      lastActivity: new Date(state.lastActivity).toISOString(),
+      tokens: stats.tokens,
+      cost: stats.cost,
+    };
+  });
 
   respond(socket, id, { agents: list });
 }

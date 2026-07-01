@@ -213,6 +213,14 @@
                   (doseq [msg (:messages data)]
                     (println (str "[" (:role msg) "] " (:content msg)))))))))
 
+(defn- format-tokens
+  "Format token counts with K/M suffixes."
+  [^long n]
+  (cond
+    (>= n 1000000) (str (format "%.1fM" (double (/ n 1000000))))
+    (>= n 1000)   (str (format "%.1fK" (double (/ n 1000))))
+    :else         (str n)))
+
 (defn handle-agent-status
   "Show status of all running agents."
   [_ctx]
@@ -222,13 +230,21 @@
                  (println (str "=== Agents: " (count agents) " running ==="))
                  (println)
                  (doseq [agent agents]
-                   (println (str (:name agent) "\t["
-                                 (if (:streaming agent) "streaming" "idle")
-                                 "]\t" (:messageCount agent) " msgs"
-                                 (when (:model agent)
-                                   (str "\tModel: " (:model agent)))
-                                 (when (:preview agent)
-                                   (str "\t" (:preview agent))))))))))
+                   (let [tokens (:tokens agent)
+                         cost (:cost agent)
+                         token-str (when tokens
+                                     (str " Tokens: " (format-tokens (or (:total tokens) 0))))
+                         cost-str (when cost
+                                    (str " Cost: $" (format "%.4f" (double cost))))]
+                     (println (str (:name agent) "\t["
+                                   (if (:streaming agent) "streaming" "idle")
+                                   "]\t" (:messageCount agent) " msgs"
+                                   token-str
+                                   cost-str
+                                   (when (:model agent)
+                                     (str "\tModel: " (:model agent)))
+                                   (when (:preview agent)
+                                     (str "\t" (:preview agent)))))))))))
 
 (defn handle-agent-delete
   "Delete an agent."
